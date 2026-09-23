@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Phasmophobia ゴースト識別ツール v2</title>
+<style>
+:root{
+  --bg:#0d1117; --panel:#151b23; --panel2:#1b2330; --line:#2b3545;
+  --text:#eef3f8; --muted:#9eabb9; --accent:#7dd3fc; --yes:#67e8a5;
+  --no:#fb7185; --warn:#fbbf24; --chip:#222c3a;
+}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(180deg,#0b0f14,#111722);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif}
+header{padding:18px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(13,17,23,.95);backdrop-filter:blur(10px);z-index:10}
+h1{font-size:21px;margin:0 0 5px}.sub{font-size:12px;color:var(--muted)}
+.wrap{max-width:1450px;margin:auto;padding:16px;display:grid;grid-template-columns:390px 1fr;gap:16px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.controls{padding:14px}
+.tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:12px}
+.tab{border:1px solid var(--line);background:var(--panel2);color:var(--muted);padding:11px 7px;border-radius:10px;font-weight:800;cursor:pointer}
+.tab.active{color:#071017;background:var(--accent);border-color:var(--accent)}
+.tab small{display:block;font-size:10px;font-weight:500;margin-top:2px}
+.section{margin:12px 0 15px}.section h2{font-size:13px;margin:0 0 8px;color:#dbe7f2}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.obs,.ev{
+  border:1px solid var(--line);background:#111822;color:#dce5ee;border-radius:9px;
+  padding:9px 10px;text-align:left;cursor:pointer;font-size:12px;line-height:1.3;
+  min-height:43px;transition:.12s;
+}
+.obs:hover,.ev:hover{border-color:#60738a}
+.obs.yes,.ev.yes{border-color:var(--yes);background:rgba(103,232,165,.11);color:#caffdf}
+.obs.no,.ev.no{border-color:var(--no);background:rgba(251,113,133,.10);color:#ffd0d7}
+.obs .state,.ev .state{float:right;font-weight:900;margin-left:6px}
+.legend{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin:10px 0}
+.legend span{padding:3px 7px;border-radius:999px;background:var(--chip)}
+.reset{width:100%;padding:10px;border:1px solid var(--line);background:#202a38;color:#fff;border-radius:9px;cursor:pointer;font-weight:700}
+.resultHead{padding:14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.count{font-weight:900}.hint{font-size:11px;color:var(--muted)}
+.cards{padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px}
+.card{background:#111822;border:1px solid var(--line);border-radius:12px;padding:13px;position:relative}
+.card.top{border-color:#4b7a96;box-shadow:0 0 0 1px rgba(125,211,252,.08)}
+.name{font-size:17px;font-weight:900}.en{font-size:11px;color:var(--muted);font-weight:500}
+.score{position:absolute;right:12px;top:12px;font-size:18px;font-weight:900;color:var(--accent)}
+.badges{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}
+.badge{font-size:10px;padding:4px 7px;border-radius:999px;background:var(--chip);color:#cbd5e1}
+.badge.lock{border:1px solid #6b5b1b;color:#fde68a}
+.desc{font-size:12px;line-height:1.5;color:#d7e0ea;margin:8px 0}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.box{background:#0d141d;border-radius:8px;padding:8px}.box b{font-size:10px;color:var(--muted);display:block;margin-bottom:3px}
+.reasons{font-size:11px;line-height:1.45;color:#b9c7d6;margin-top:8px}
+.reason.plus{color:#9df0be}.reason.minus{color:#ffadb9}
+.empty{padding:40px;text-align:center;color:var(--muted)}
+.note{font-size:10px;color:#8391a0;line-height:1.5;margin-top:10px}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}.controls{position:static}.cards{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>👻 Phasmophobia ゴースト識別ツール</h1>
+  <div class="sub">証拠はハード絞り込み／特徴は重み付け。プルダウンなし・全部1タップ。</div>
+</header>
+
+<div class="wrap">
+  <aside class="panel">
+    <div class="controls">
+      <div class="tabs">
+        <button class="tab active" data-tab="evidence">通常の証拠<small>7種</small></button>
+        <button class="tab" data-tab="hunt">ハント時<small>速度・視認・点滅</small></button>
+        <button class="tab" data-tab="other">ハント以外<small>能力・干渉</small></button>
+      </div>
+
+      <div id="tab-evidence" class="tabbody"></div>
+      <div id="tab-hunt" class="tabbody" hidden></div>
+      <div id="tab-other" class="tabbody" hidden></div>
+
+      <div class="legend">
+        <span>未確認</span><span style="color:#67e8a5">✓ ある</span><span style="color:#fb7185">× ない</span>
+      </div>
+      <button id="reset" class="reset">全部リセット</button>
+      <div class="note">特徴は「確定証拠」ではなく識別用の重み付けです。特殊能力は発動条件があるため、未確認なら点数に影響しません。</div>
+    </div>
+  </aside>
+
+  <main class="panel">
+    <div class="resultHead">
+      <div><span class="count" id="count"></span> <span class="hint">／証拠は「✓」で必須・「×」で除外</span></div>
+      <div class="hint" id="summary"></div>
+    </div>
+    <div id="cards" class="cards"></div>
+  </main>
+</div>
+
+<script>
+const E = {
+  emf:"EMFレベル5", box:"スピリットボックス", uv:"紫外線",
+  orb:"ゴーストオーブ", write:"ゴーストライティング", freeze:"氷点下の温度", dots:"D.O.T.S."
+};
+
+const ghosts = [
+{name:"スピリット",en:"Spirit",ev:["emf","box","write"],san:"50%",hunt:"通常速度・通常の視認加速",other:"浄化香後のハント待機が180秒。",features:["浄化香後、通常より長くハントしない"]},
+{name:"レイス",en:"Wraith",ev:["emf","box","dots"],san:"50%",hunt:"通常速度・通常の視認加速",other:"塩を踏まない。非ハント時にプレイヤー位置へワープすることがある。",features:["塩を踏まない","非ハント時にプレイヤーへワープ"]},
+{name:"ファントム",en:"Phantom",ev:["box","uv","dots"],san:"50%",hunt:"点滅が長い／見えている時間が短い",other:"写真撮影で姿が消える。イベント中の視認で正気度が追加減少。",features:["ハント中の不可視時間が長い","写真で姿が消える"]},
+{name:"ポルターガイスト",en:"Poltergeist",ev:["box","uv","write"],san:"50%",hunt:"通常速度・通常の視認加速",other:"物を大量に投げる特殊能力。ハント中も物を投げやすい。",features:["複数の物を一気に投げる","物への干渉が多い"]},
+{name:"バンシー",en:"Banshee",ev:["uv","orb","dots"],san:"対象者のSAN 50%",hunt:"特定ターゲットを追う",other:"指向性マイク／サウンドレコーダーで特殊な叫び声。歌う超常現象を好む。",features:["特殊な叫び声","ハント中にターゲット以外を基本的に狙わない"]},
+{name:"ジン",en:"Jinn",ev:["emf","uv","freeze"],san:"50%",hunt:"ブレーカーON＋視認＋3mより遠いと2.5m/s固定",other:"ブレーカーを直接OFFにしない。条件成立時に同室プレイヤーのSANを25%減少させる。",features:["ブレーカーON時の高速固定","3m以内または見失うと高速固定解除"]},
+{name:"メアー",en:"Mare",ev:["box","orb","write"],san:"暗所60%／明所40%",hunt:"通常速度・通常の視認加速",other:"照明を消しやすい。照明スイッチをONにできない。",features:["暗所でハント閾値が高い","照明をONにしない"]},
+{name:"レヴナント",en:"Revenant",ev:["orb","write","freeze"],san:"50%",hunt:"未検知1.0m/s → 検知すると即3.0m/s。通常LOS加速なし",other:"プレイヤーを見失っても急には元速度へ戻らない。",features:["非常に遅い→検知で一気に3.0m/s","通常の視認加速なし"]},
+{name:"シェード",en:"Shade",ev:["emf","write","freeze"],san:"35%",hunt:"通常速度・通常の視認加速",other:"プレイヤーがゴーストと同室だと干渉・超常現象・自然ハントを起こさない。",features:["同室では活動しない","ハント閾値35%"]},
+{name:"デーモン",en:"Demon",ev:["uv","write","freeze"],san:"70%／特殊ハントはSAN無視",hunt:"通常速度・通常の視認加速",other:"浄化香後のハント待機60秒。十字架有効範囲が広い。",features:["70%からハント可能","SAN無視の特殊ハント","浄化香後60秒"]},
+{name:"幽霊",en:"Yurei",ev:["orb","freeze","dots"],san:"50%",hunt:"通常速度・通常の視認加速",other:"特殊能力で扉を完全に閉じ、周囲のSANを15%減少。浄化香で90秒ゴーストルームに拘束。",features:["無音で扉を完全閉鎖する特殊能力","浄化香後90秒ゴーストルームに留まる"]},
+{name:"鬼",en:"Oni",ev:["emf","freeze","dots"],san:"50%",hunt:"点滅が非常に速い／実体化時間が長い",other:"霧の姿の超常現象をしない。超常現象のSAN減少が大きい。",features:["ハント中ほぼ見えっぱなし","霧イベントをしない","超常現象が多め"]},
+{name:"妖怪",en:"Yokai",ev:["box","orb","dots"],san:"通常50%／同室VCで80%",hunt:"通常の視認加速",other:"ハント中の声・電子機器の検知範囲が非常に狭い。",features:["同室で喋ると80%からハント可能","ハント中の音・電子機器検知が狭い"]},
+{name:"ハントゥ",en:"Hantu",ev:["uv","orb","freeze"],san:"50%",hunt:"温度で速度変化1.4～2.7m/s／通常LOS加速なし",other:"ブレーカーOFFのハント中に白い息。氷点下を必ず出す。",features:["寒いほど速い","通常の視認加速なし","ブレーカーOFFで白い息"]},
+{name:"御霊",en:"Goryo",ev:["emf","uv","dots"],san:"50%",hunt:"通常速度・通常の視認加速",other:"D.O.T.S.はカメラ越し＋プレイヤー不在時。ゴーストルームを移動しない。",features:["カメラ越しでのみD.O.T.S.","ゴーストルームを移動しない"]},
+{name:"マイリング",en:"Myling",ev:["emf","uv","write"],san:"50%",hunt:"通常速度・通常の視認加速",other:"ハント中の足音・声が近距離まで聞こえにくい。",features:["ハント中の足音が約12mまでしか聞こえない","怪奇音のクールタイムが短め"]},
+{name:"怨霊",en:"Onryo",ev:["box","orb","freeze"],san:"60%／火の近く40%",hunt:"通常速度・通常の視認加速",other:"炎を3回吹き消すとSANを無視した特殊ハントを準備。炎が十字架の代わりになる。",features:["炎を3回消すと特殊ハント","炎の近くではハントしにくい"]},
+{name:"ツインズ",en:"The Twins",ev:["emf","box","freeze"],san:"50%",hunt:"ハントごとに約1.5m/sか1.9m/s。2地点から干渉",other:"離れた場所からの干渉がある。",features:["速い／遅いハントがある","離れた場所からEMF干渉"]},
+{name:"雷獣",en:"Raiju",ev:["emf","orb","dots"],san:"通常50%／電子機器付近65%",hunt:"電子機器付近で2.5m/s固定",other:"電子機器への干渉距離が長い。",features:["電子機器付近で高速化","電子機器付近でハント閾値上昇"]},
+{name:"化け狐",en:"Obake",ev:["emf","uv","orb"],san:"50%",hunt:"通常速度・通常の視認加速",other:"紫外線証拠を必ず持つ。指紋が6本指になることがある。",features:["ハント中の点滅で別モデルへ変身","6本指の指紋","UVを残さないことがある"]},
+{name:"ミミック",en:"The Mimic",ev:["box","uv","freeze"],san:"真似しているゴースト依存",hunt:"他ゴーストのハント挙動をコピー",other:"偽のゴーストオーブを必ず出す。",features:["他ゴーストの特徴を真似する","偽ゴーストオーブ"]},
+{name:"モーロイ",en:"Moroi",ev:["box","write","freeze"],san:"50%",hunt:"SANが低いほど速い。通常LOS加速もあり得る",other:"声を聞くと呪い。浄化香でハント中の見失い時間が通常より長い。",features:["SAN低下で速度上昇","呪いでSAN減少が加速","浄化香で7秒見失う"]},
+{name:"デオヘン",en:"Deogen",ev:["box","write","dots"],san:"40%",hunt:"遠距離は約3.0m/s、近距離で約0.4m/sまで連続減速。LOS加速なし",other:"常にプレイヤー位置を把握。隠れても見つかる。",features:["隠れても必ず見つかる","近づくほど極端に遅くなる","荒い呼吸のSpirit Box"]},
+{name:"セーイ",en:"Thaye",ev:["orb","write","dots"],san:"若いほど高い／老化で低下",hunt:"若い2.75m/s → 老化で約1.0m/s。通常LOS加速なし",other:"時間経過＋プレイヤーの接近で老化。老化すると活動・速度・ハント閾値が低下。",features:["時間経過で老化","若い時は速い","通常の視認加速なし"]},
+{name:"ダヤン",en:"Dayan",ev:["emf","orb","box"],san:"近くで移動65%／静止45%／10m外50%",hunt:"10m以内で動いている人がいると2.25m/s固定、静止で1.2m/s固定",other:"女性モデル・名前のみ。",features:["近くで動くと速くなる","近くで止まると遅くなる","ハント閾値も移動状態で変化"]},
+{name:"ガルル",en:"Gallu",ev:["emf","uv","box"],san:"通常50／激昂60／疲弊40%",hunt:"通常1.7／激昂1.955／疲弊1.36m/s",other:"塩・浄化香・十字架で状態変化。激昂時は塩を踏まない。",features:["防護装備で状態変化","激昂で速い／疲弊で遅い","激昂時は塩を踏まない"]},
+{name:"オバンボ",en:"Obambo",ev:["uv","write","dots"],san:"穏やか10%／攻撃的65%",hunt:"穏やか1.445／攻撃的1.955m/s。ハント中も状態切替",other:"扉開錠1分後、その後2分ごとに穏やか／攻撃的を切替。",features:["ハント中に速度が切り替わる","攻撃的ハントは約20%短い","状態が時間で切り替わる"]},
+{name:"アスワング",en:"Aswang",ev:["freeze","write","dots"],san:"50%",hunt:"約1.53m/s。LOS加速が非常に速い",other:"公式のクローゼット／ロッカーに隠れたプレイヤーを殺さず、ハントを終了する特殊挙動。",features:["通常より速いペースでLOS最大加速へ","公式隠れ場所でハント中断"]},
+{name:"コルモス",en:"Kormos",ev:["orb","box","uv"],san:"通常50%／同室走行感知70%",hunt:"視認せず音で追跡。検知時に約2.21m/s。通常LOS加速なし",other:"足音・声・電子機器を感知。走ると遠距離から検知しやすい。",features:["視認せず音を頼りに追跡","走るとハント閾値70%","音を感知すると高速追跡"]},
+{name:"ディルデガスト",en:"Deildegast",ev:["emf","write","dots"],san:"50%",hunt:"ハント開始時3.0m/s。物を動かすほど次のハントが遅くなる。LOS加速なし",other:"動かした物体数で速度低下。ハント終了／十字架で3.0m/sへリセット。",features:["初速3.0m/s","物を動かすほど遅くなる","通常の視認加速なし"]}
+];
+
+const obs = {
+  hunt:[
+    ["normalLos","視認し続けると通常のように徐々に加速する",5],
+    ["noLos","通常の視認加速をしない",7],
+    ["instant3","検知した瞬間に約3.0m/s級へ一気に加速",8],
+    ["slow1","未検知時が約1.0m/s級の極端な低速",6],
+    ["farFastNearSlow","遠いと速い／近づくと極端に遅い",9],
+    ["tempSpeed","部屋の温度で速度が変わる",8],
+    ["sanSpeed","SANが低いほどハント速度が上がる",8],
+    ["electronicsSpeed","電子機器の近くで高速固定",8],
+    ["breakerSpeed","ブレーカーON＋視認＋距離条件で高速固定",8],
+    ["movementSpeed","近くのプレイヤーの移動で速度が変わる",8],
+    ["midSwitch","ハント途中で速度状態が切り替わる",8],
+    ["itemSlow","動かした物の数で次のハント速度が落ちる",9],
+    ["longBlink","ゴーストが消えている時間が明らかに長い",9],
+    ["shortBlink","ゴーストがほぼ見えっぱなし",9],
+    ["modelMorph","点滅中にモデルが別ゴーストへ変わる",10],
+    ["targetLock","特定プレイヤーだけを追う",8],
+    ["alwaysKnow","隠れても位置を把握している",10],
+    ["soundTrack","視認せず音・声・電子機器で追跡する",10],
+    ["quietFoot","足音がかなり近距離まで聞こえない",8],
+    ["whiteBreath","ブレーカーOFFのハントで白い息",7],
+    ["incenseLong","浄化香後の見失い時間が長い",7]
+  ],
+  other:[
+    ["noSalt","塩を踏まない／塩を無視する",8],
+    ["polterThrow","物を大量・同時に投げる",9],
+    ["photoVanish","写真撮影で姿が消える",9],
+    ["bigSigh","霧の姿の『クソデカため息』をしない",5],
+    ["bansheeScream","指向性マイク等で特殊な叫び声",10],
+    ["noLightOn","照明スイッチをONにしない",7],
+    ["doorAbility","扉を完全に閉める特殊挙動",8],
+    ["goryoDots","カメラ越し＋無人時のみD.O.T.S.",10],
+    ["sameRoomNoAction","同室にいると干渉・イベント・自然ハントが止まる",10],
+    ["flame3","炎を3回消した後に特殊ハント",10],
+    ["longSmudgeSpirit","浄化香後180秒ハントしない",10],
+    ["shortSmudgeDemon","浄化香後60秒で再ハント可能",10],
+    ["onryoFlameBlock","炎が近いとハント試行が炎消しで阻止される",9],
+    ["galluState","塩・浄化香・十字架で状態が変わる",10],
+    ["thayeAge","時間経過と接近で老化する",10],
+    ["aswangHide","公式隠れ場所に入るとハントが終了する",10],
+    ["mimicOrb","偽ゴーストオーブが出る",10],
+    ["yokaiVoice","同室で喋ると高SANでもハントし得る",8],
+    ["shadeNear","同室では活動しない",10],
+    ["mareLight","照明を消しやすくONにしない",8],
+    ["yureiSmudge","浄化香後90秒ゴーストルームに留まる",9],
+    ["wraithWarp","非ハント時にプレイヤーへワープ",8],
+    ["mylingAudio","足音・声が近距離まで聞こえない",8],
+    ["obakeFinger","6本指など特殊なUV",9],
+    ["onryoFire","炎が十字架代わりになる",8],
+    ["galluSalt","激昂時に塩を踏まない",8]
+  ]
+};
+
+// Each behavior key maps to ghost tendencies. +weight = expected, -weight = contradiction.
+// A few generic traits intentionally have lower weight; evidence is the hard filter.
+const W = {
+ Spirit:{longSmudgeSpirit:10},
+ Wraith:{noSalt:8,wraithWarp:8},
+ Phantom:{longBlink:9,photoVanish:9},
+ Poltergeist:{polterThrow:9},
+ Banshee:{bansheeScream:10,targetLock:8},
+ Jinn:{breakerSpeed:8},
+ Mare:{noLightOn:7,mareLight:8},
+ Revenant:{instant3:8,slow1:6,noLos:7},
+ Shade:{sameRoomNoAction:10,shadeNear:10},
+ Demon:{shortSmudgeDemon:10},
+ Yurei:{doorAbility:8,yureiSmudge:9},
+ Oni:{shortBlink:9,bigSigh:5},
+ Yokai:{yokaiVoice:8},
+ Hantu:{tempSpeed:8,noLos:7,whiteBreath:7},
+ Goryo:{goryoDots:10},
+ Myling:{quietFoot:8,mylingAudio:8},
+ Onryo:{flame3:10,onryoFire:8,onryoFlameBlock:9},
+ "The Twins":{midSwitch:4},
+ Raiju:{electronicsSpeed:8},
+ Obake:{modelMorph:10,obakeFinger:9},
+ "The Mimic":{mimicOrb:10},
+ Moroi:{sanSpeed:8,incenseLong:7},
+ Deogen:{farFastNearSlow:9,alwaysKnow:10,noLos:7},
+ Thaye:{noLos:7,thayeAge:10},
+ Dayan:{movementSpeed:8,midSwitch:5},
+ Gallu:{galluState:10,galluSalt:8,midSwitch:7},
+ Obambo:{midSwitch:8},
+ Aswang:{normalLos:5,aswangHide:10},
+ Kormos:{soundTrack:10,noLos:7},
+ Deildegast:{instant3:7,itemSlow:9,noLos:7}
+};
+
+const keyFor = g => g.en;
+const states = {};
+const keys = [...obs.hunt,...obs.other].map(x=>x[0]);
+keys.forEach(k=>states[k]=0);
+const evidenceState = {};
+Object.keys(E).forEach(k=>evidenceState[k]=0);
+
+function cycle(obj,k){
+  obj[k]=(obj[k]+1)%3; // 0 neutral, 1 yes, 2 no
+  render();
+}
+function stateLabel(v){return v===1?"✓":v===2?"×":""}
+function stateClass(v){return v===1?"yes":v===2?"no":""}
+
+function makeButtons(items, obj, kind){
+  return items.map(([k,label,w])=>{
+    const v=obj[k]||0;
+    return `<button class="${kind} ${stateClass(v)}" onclick="${kind==='ev'?`cycle(evidenceState,'${k}')`:`cycle(states,'${k}')`}">
+      ${label}<span class="state">${stateLabel(v)}</span>
+    </button>`;
+  }).join("");
+}
+function group(title,items,kind){
+  return `<div class="section"><h2>${title}</h2><div class="btns">${makeButtons(items,kind==='ev'?evidenceState:states,kind)}</div></div>`;
+}
+function renderControls(){
+  document.getElementById("tab-evidence").innerHTML =
+    group("証拠（✓で確定／×で除外）",Object.entries(E).map(([k,v])=>[k,v]),"ev")+
+    `<div class="section"><h2>難易度</h2><div class="btns">
+      <button class="obs ${difficulty==='standard'?'yes':''}" onclick="difficulty='standard';render()">Standard<span class="state">${difficulty==='standard'?'✓':''}</span></button>
+      <button class="obs ${difficulty==='nightmare'?'yes':''}" onclick="difficulty='nightmare';render()">Nightmare<span class="state">${difficulty==='nightmare'?'✓':''}</span></button>
+      <button class="obs ${difficulty==='insanity'?'yes':''}" onclick="difficulty='insanity';render()">Insanity<span class="state">${difficulty==='insanity'?'✓':''}</span></button>
+    </div></div>`;
+
+  document.getElementById("tab-hunt").innerHTML =
+    group("視認・速度",obs.hunt.slice(0,12),"obs")+
+    group("点滅・追跡・音",obs.hunt.slice(12),"obs");
+
+  document.getElementById("tab-other").innerHTML =
+    group("超常現象・干渉",obs.other.slice(0,12),"obs")+
+    group("能力・環境",obs.other.slice(12),"obs");
+}
+let difficulty="standard";
+
+function evidenceAllowed(g){
+  for(const [k,v] of Object.entries(evidenceState)){
+    if(v===1 && !g.ev.includes(k)) return false;
+    if(v===2 && g.ev.includes(k)) return false;
+  }
+  return true;
+}
+
+function scoreGhost(g){
+  let score=0, reasons=[];
+  for(const [k,v] of Object.entries(states)){
+    if(!v) continue;
+    const weight=(W[g.en]&&W[g.en][k])||0;
+    if(v===1){
+      if(weight>0){score+=weight; reasons.push(`<span class="reason plus">+${weight} ${labelOf(k)}</span>`);}
+      else if(weight<0){score+=weight; reasons.push(`<span class="reason minus">${weight} ${labelOf(k)}</span>`);}
+      else {score-=1; reasons.push(`<span class="reason minus">-1 一般的挙動</span>`);}
+    }else if(v===2){
+      if(weight>0){score-=weight; reasons.push(`<span class="reason minus">-${weight} ${labelOf(k)}なし</span>`);}
+    }
+  }
+  return {score,reasons};
+}
+function labelOf(k){
+  for(const [,arr] of Object.entries(obs)) for(const x of arr) if(x[0]===k) return x[1];
+  return k;
+}
+function renderCards(){
+  const candidates=ghosts.filter(evidenceAllowed).map(g=>({...g,...scoreGhost(g)})).sort((a,b)=>b.score-a.score);
+  const strongCount=Object.values(states).filter(v=>v===1).length;
+  document.getElementById("count").textContent=`候補 ${candidates.length}体`;
+  const evs=Object.entries(evidenceState).filter(([,v])=>v).map(([k,v])=>`${v===1?'✓':'×'}${E[k]}`);
+  document.getElementById("summary").textContent=(evs.length?evs.join(" / ")+"　":"")+"特徴入力 "+strongCount+"件";
+
+  document.getElementById("cards").innerHTML=candidates.length?candidates.map((g,i)=>`
+    <article class="card ${i===0&&g.score>0?'top':''}">
+      <div class="name">${g.name} <span class="en">${g.en}</span></div>
+      <div class="score">${g.score>0?'+':''}${g.score}</div>
+      <div class="badges">${g.ev.map(k=>`<span class="badge">${E[k]}</span>`).join("")}</div>
+      <div class="desc">${g.features.join(" ／ ")}</div>
+      <div class="row">
+        <div class="box"><b>ハント開始SAN</b>${g.san}</div>
+        <div class="box"><b>ハント特徴</b>${g.hunt}</div>
+      </div>
+      <div class="desc"><b>ハント外：</b>${g.other}</div>
+      ${g.reasons.length?`<div class="reasons"><b>今回の判定：</b> ${g.reasons.slice(0,7).join("　")}</div>`:""}
+    </article>`).join(""):`<div class="empty">証拠条件が矛盾しています。✓と×を見直してください。</div>`;
+}
+function render(){renderControls();renderCards();}
+document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".tabbody").forEach(x=>x.hidden=true);
+  b.classList.add("active");document.getElementById("tab-"+b.dataset.tab).hidden=false;
+}));
+document.getElementById("reset").onclick=()=>{
+  Object.keys(states).forEach(k=>states[k]=0);
+  Object.keys(evidenceState).forEach(k=>evidenceState[k]=0);
+  difficulty="standard";render();
+};
+render();
+</script>
+</body>
+</html>
